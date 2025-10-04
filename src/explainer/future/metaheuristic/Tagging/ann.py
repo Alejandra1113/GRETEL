@@ -1,3 +1,4 @@
+import warnings
 import hnswlib
 import numpy as np
 from typing import Iterable, Optional
@@ -41,47 +42,76 @@ class ANNIndexWeighted:
     
     def recalculate_weights_from_indices(
         self,
-        idxs: Iterable[int],
-        old_weight_share: float = 0.5,  # 50% current weights
+        added: set[int],
+        removed: set[int],
+        old_weight_share: float = 0.5,  # share for current weights in the blend
     ) -> None:
         """
-        Update self.w using the current weights (old_weight_share)
-        and per-dimension signal from X_raw rows in `idxs` (1 - old_weight_share).
-        Higher per-dim values in X_raw -> higher new weight.
-        Always keeps weights in [0,1], then rebuilds the index.
-
-        Strategy:
-          score_j = mean(abs(X_raw[idxs, j]))    # per-dimension magnitude
-          scaled_j = score_j / max(score)        # in [0,1]
-          new_w = old_weight_share * w + (1-old_weight_share) * scaled
+        Recompute self.w using both "added" (upweight) and "removed" (downweight).
+        - Per-dimension 'added' signal is mean(|X_raw[added, j]|), normalized to [0,1].
+        - Per-dimension 'removed' penalty is mean(|X_raw[removed, j]|) * current_weight_j,
+        normalized to [0,1] before applying the current-weight modulation.
+        - Combined signal = scaled_added - (scaled_removed * current_weight).
+        - Map combined signal from [-1,1] -> [0,1] via (signal+1)/2.
+        - Blend: new_w = old_weight_share * old_w + (1-old_weight_share) * mapped_signal.
+        Always clips to [0,1] and rebuilds the index.
         """
-        idxs = np.asarray(list(idxs), dtype=np.int32)
-        if idxs.size == 0:
-            return  # nothing to do
+        def _normalize01(arr: np.ndarray) -> np.ndarray:
+            # Normalize a 1D nonnegative array to [0,1] robustly
+            maxv = float(np.max(arr))
+            if not np.isfinite(maxv) or maxv <= 1e-12:
+                return np.zeros_like(arr, dtype=np.float32)
+            return (arr / maxv).astype(np.float32)
 
-        if np.any((idxs < 0) | (idxs >= self.N)):
-            raise IndexError("Some indices in idxs are out of bounds.")
+        # Coerce to sorted np arrays (and allow empty)
+        added_idx = np.asarray(sorted(added), dtype=np.int32) if added else np.empty(0, dtype=np.int32)
+        removed_idx = np.asarray(sorted(removed), dtype=np.int32) if removed else np.empty(0, dtype=np.int32)
 
-        # Per-dimension signal from the selected rows
-        Xsel = self.X_raw[idxs]                # (m, K)
-        score = np.mean(np.abs(Xsel), axis=0)  # (K,)
+        # Fast exit if both empty
+        if added_idx.size == 0 and removed_idx.size == 0:
+            return
 
-        # Normalize to [0,1] (avoid divide-by-zero)
-        maxv = np.max(score)
-        if maxv <= 1e-12:
-            scaled = np.zeros_like(score, dtype=np.float32)
+        # Bounds checks
+        if added_idx.size and np.any((added_idx < 0) | (added_idx >= self.N)):
+            raise IndexError("Some indices in 'added' are out of bounds.")
+        if removed_idx.size and np.any((removed_idx < 0) | (removed_idx >= self.N)):
+            raise IndexError("Some indices in 'removed' are out of bounds.")
+
+        # ----- Per-dimension signals -----
+        # Added signal: larger magnitudes -> higher weight
+        if added_idx.size:
+            X_add = self.X_raw[added_idx]                      # (m_add, K)
+            score_add = np.mean(np.abs(X_add), axis=0)         # (K,)
+            scaled_add = _normalize01(score_add)               # [0,1]
         else:
-            scaled = (score / maxv).astype(np.float32)
+            scaled_add = np.zeros(self.K, dtype=np.float32)
 
-        # Blend 50/50 with existing weights (clip to [0,1])
+        # Removed signal: larger magnitudes -> stronger penalty
+        if removed_idx.size:
+            X_rem = self.X_raw[removed_idx]                    # (m_rem, K)
+            score_rem = np.mean(np.abs(X_rem), axis=0)         # (K,)
+            scaled_rem = _normalize01(score_rem)               # [0,1]
+            # Modulate penalty by current weights so already-important dims lose more
+            penalty = scaled_rem * self.w                      # [0,1]
+        else:
+            penalty = np.zeros(self.K, dtype=np.float32)
+
+        # ----- Combine into a single proposal in [0,1] -----
+        # signal in [-1,1]
+        signal = np.clip(scaled_add - penalty, -1.0, 1.0).astype(np.float32)
+        # map to [0,1]
+        proposal = (signal + 1.0) * 0.5
+
+        # ----- Blend with current weights -----
         alpha = float(old_weight_share)
-        alpha = min(1.0, max(0.0, alpha))
-        new_w = alpha * self.w + (1.0 - alpha) * scaled
-        new_w = np.clip(new_w, 0.0, 1.0).astype(np.float32)
+        alpha = min(1.0, max(0.0, alpha))  # clamp
+        new_w = alpha * self.w + (1.0 - alpha) * proposal
+        new_w = np.clip(new_w.astype(np.float32), 0.0, 1.0)
 
-        # Set & rebuild to reflect the new distance metric
+        # Apply & rebuild to reflect new metric
         self.w = new_w
         self._rebuild_index()
+
         
         
     def update_weights(self, idxs: Iterable[int], vals: Iterable[float]):
@@ -100,65 +130,97 @@ class ANNIndexWeighted:
     # -------- Adding --------
     def neighbors_of_S_union(
         self,
-        S: set,
-        top_k: int
-    ) -> list[int]:
+        S: set[int],
+        top_k: int,
+        rng: np.random.Generator | None = None,
+    ) -> tuple[set[int], set[int]]:
         """
         For each s in S, retrieve its neighbors in the weighted-cosine space,
         union all neighbor labels (deduped), then return a RANDOM batch of size
         `top_k` from that union (excluding S itself).
 
-        If fewer than `top_k` unique candidates exist, returns all of them and raises a warning.
-        """
+        If fewer than `top_k` unique candidates exist, returns all of them and emits a warning.
 
-        S_arr = np.fromiter(S, dtype=np.int32)
+        Returns:
+            (full_solution_indices, added_indices) as sets of 0-based dataset indices.
+        """
+        if rng is None:
+            rng = np.random.default_rng()
+
+        if top_k <= 0 or not S:
+            return set(S), set()
 
         # Ask a bit more per query to offset filtering of S itself
         per_query_k = min(self.N, top_k + len(S))
-        labels_union = set()
 
-        for s in S_arr:
+        labels_union: set[int] = set()
+
+        for s in S:  # iterate the set directly; no need to build an array
             # weighted + normalized query vector
             q = self._normalize(self._weighted(self.X_raw[s]))
             local_labels, _ = self.index.knn_query(q, k=per_query_k)
-            # Deduplicate across queries and exclude S itself
+
+            # Deduplicate across queries and exclude S; also guard invalid labels
             for lab in local_labels[0]:
-                if lab not in S:
-                    labels_union.add(int(lab))
+                li = int(lab)
+                if li >= 0 and li < self.N and li not in S:
+                    labels_union.add(li)
 
-        # Random sample of size top_k (or all if fewer available)
         if not labels_union:
-            return []
-        candidates = np.fromiter(labels_union, dtype=np.int32)
-        k = min(top_k, candidates.size)
+            return set(S), set()
 
-        # np.random.choice without replacement over a 1D array
-        picked = np.random.choice(candidates, size=k, replace=False)
-        assert len(picked) == top_k, "picked fewer than top_k"
-        return picked.tolist()
+        candidates = np.fromiter(labels_union, dtype=np.int32)
+
+        k = min(top_k, candidates.size)
+        if k < top_k:
+            warnings.warn(
+                f"Only {k} unique candidates available (requested top_k={top_k}). Returning all.",
+                RuntimeWarning,
+            )
+
+        # Sample without replacement; returns an ndarray
+        picked = rng.choice(candidates, size=k, replace=False)
+
+        added = set(map(int, picked))
+        full = set(S) | added
+        return full, added
+
 
     def neighbors_of_centroid(
         self,
-        S: list,
-        top_k : int,
-    ) -> list[int]:
+        S: list[int],
+        top_k: int,
+    ) -> tuple[set[int], set[int]]:
         """
         Find neighbors near the weighted centroid of rows in S.
-        Returns list of indices (and optional distances) in 0-based dataset coords.
+        Returns (full_solution_indices, added_indices) as sets of 0-based dataset indices.
         """
-        S = np.asarray(S, dtype=np.int32)
-        top_k_per_query = min(self.N, top_k + len(S))
-        # Weighted & normalized query
-        centroid = self._weighted(self.X_raw[S]).mean(axis=0)
+        # Work in arrays, but avoid Python lists
+        S_arr = np.asarray(S, dtype=np.int32)
+
+        top_k_per_query = min(self.N, top_k + S_arr.size)
+
+        # Weighted centroid, then normalize
+        centroid = self._weighted(self.X_raw[S_arr]).mean(axis=0)
         centroid = self._normalize(centroid)
 
         labels, _ = self.index.knn_query(centroid, k=top_k_per_query)
-        result = labels[0]
+        result = labels[0]  # np.ndarray of candidate indices
 
-        result = [r for r in result if r not in S]
-        result = result[:top_k]
+        # Keep ANN order: use np.isin mask (not setdiff1d, which sorts)
+        mask = ~np.isin(result, S_arr, assume_unique=False)
+        filtered = result[mask]
 
-        return result
+        # Take top_k after exclusion
+        added = filtered[:top_k]
+
+        # Build sets without creating intermediate Python lists
+        added_set = set(map(int, added))
+        kept_set = set(map(int, S_arr))
+        full_set = kept_set | added_set
+
+        return full_set, added_set
+
     
     
     
@@ -166,65 +228,70 @@ class ANNIndexWeighted:
     
     def prune_farthest_in_S(
         self,
-        S: set,                 # set of 0-based dataset indices
-        remove_k: int,          # how many to drop
-        temperature: float = 0.3,   # lower = greedier, 0 -> deterministic farthest
+        S: set[int],                        # set of 0-based dataset indices
+        remove_k: int,                      # how many to drop
+        temperature: float = 0.3,           # lower = greedier, 0 -> deterministic farthest
         rng: np.random.Generator | None = None,
-    ) -> tuple[list[int], list[int]]:
+    ) -> tuple[set[int], set[int]]:
         """
-        Stochastically remove `remove_k` elements of S, biased toward those farthest
-        from S's weighted centroid (cosine distance in weighted space).
+        Stochastically remove `remove_k` elements from S, biased toward those farthest
+        from S's weighted, L2-normalized centroid (cosine distance in normalized space).
 
-        - `temperature=0`  -> deterministic: drop the farthest `remove_k`.
+        - temperature <= 0  -> deterministic: drop the farthest `remove_k`.
         - higher temperature -> more randomness.
-        Returns (kept_indices, removed_indices), both as lists of dataset indices.
+
+        Returns:
+            (kept_indices, removed_indices) as sets of dataset indices.
         """
-        S = np.asarray(list(S), dtype=np.int32)
-        if remove_k <= 0:
-            return S.tolist(), []
-        if remove_k >= S.size:
-            return [], S.tolist()
+        # Stable ordering for reproducibility / deterministic tie-breaking
+        S_arr = np.fromiter(sorted(S), dtype=np.int32)
+
+        n = S_arr.size
+        if remove_k <= 0 or n == 0:
+            return set(S_arr.tolist()), set()
+        if remove_k >= n:
+            return set(), set(S_arr.tolist())
 
         if rng is None:
             rng = np.random.default_rng()
 
         # Weighted + normalized reps of S
-        Xs = self._normalize(self._weighted(self.X_raw[S]))
+        Xs = self._normalize(self._weighted(self.X_raw[S_arr]))
 
         # Weighted centroid (normalized)
         centroid = self._normalize(Xs.mean(axis=0))
 
-        # Cosine distance to centroid: d = 1 - cos_sim
+        # Cosine distance to centroid: d = 1 - cos_sim  (both normalized)
         sims = Xs @ centroid
-        dists = 1.0 - sims  # in [0,2] for normalized vectors
+        dists = 1.0 - sims  # in [0, 2] for normalized vectors
 
-        # Deterministic fallback (temperature == 0)
         if temperature <= 0.0:
+            # pick farthest remove_k deterministically
             idx = np.argpartition(dists, -remove_k)[-remove_k:]
-            idx = idx[np.argsort(dists[idx])[::-1]]
-            mask = np.ones(S.size, dtype=bool)
+            idx = idx[np.argsort(dists[idx])[::-1]]  # sort descending distance
+            mask = np.ones(n, dtype=bool)
             mask[idx] = False
-            return S[mask].tolist(), S[idx].tolist()
+            return set(S_arr[mask].tolist()), set(S_arr[idx].tolist())
 
         # Probabilistic removal via softmax over distances
-        # More distant => larger probability
         eps = 1e-12
         logits = dists / max(temperature, eps)
-        logits = logits - np.max(logits)
+        logits -= np.max(logits)
         probs = np.exp(logits)
         probs_sum = probs.sum()
         if probs_sum <= 0 or not np.isfinite(probs_sum):
             probs = np.full_like(probs, 1.0 / probs.size)
         else:
-            probs = probs / probs_sum
+            probs /= probs_sum
 
         # Sample without replacement according to probs
-        idx_remove = rng.choice(S.size, size=remove_k, replace=False, p=probs)
-        mask = np.ones(S.size, dtype=bool)
+        idx_remove = rng.choice(n, size=remove_k, replace=False, p=probs)
+        mask = np.ones(n, dtype=bool)
         mask[idx_remove] = False
 
-        kept = S[mask].tolist()
-        removed = S[idx_remove].tolist()
+        kept = set(map(int, S_arr[mask]))
+        removed = set(map(int, S_arr[idx_remove]))
+
         return kept, removed
 
     

@@ -7,7 +7,8 @@ from src.core.explainer_base import Explainer
 from src.dataset.instances.base import DataInstance
 from src.dataset.instances.graph import GraphInstance
 from src.explainer.future.meta.minimizer.base import ExplanationMinimizer
-from src.explainer.future.metaheuristic.Tagging.simple_tagger import SimpleTagger
+from src.explainer.future.metaheuristic.Tagging.ann import ANNIndexWeighted
+from src.explainer.future.metaheuristic.Tagging.vectors_builder import VectorsBuilder
 from typing import Generator
 
 from src.explainer.future.metaheuristic.initial_solution_search.simple_searcher import SimpleSearcher
@@ -54,9 +55,9 @@ class LocalSearch(ExplanationMinimizer):
         self.max_neigh = self.local_config['parameters']['max_neigh']
         self.attributed = self.local_config['parameters']['attributed']
         self.max_oracle_calls = self.local_config['parameters']['max_oracle_calls']
-        
-        self.tagger = SimpleTagger()
-        
+
+
+
         self.searcher = SimpleSearcher()
         
         self.distance_metric = GraphEditDistanceMetric()  
@@ -86,6 +87,7 @@ class LocalSearch(ExplanationMinimizer):
         
         
         min_ctf = explaination.counterfactual_instances[0]
+
         
         _, diff_matrix = get_edge_differences(self.G, min_ctf)
         different_coordinates = np.where(diff_matrix == 1)        
@@ -104,7 +106,6 @@ class LocalSearch(ExplanationMinimizer):
         self.cache = FixedSizeCache(capacity=500000)
         result = self.get_approximation(actual, best, min_ctf)
         
-        
         return result
         
         
@@ -114,6 +115,9 @@ class LocalSearch(ExplanationMinimizer):
 
         result = min_ctf
         
+        builder = VectorsBuilder(["degree"], self.G.data)
+        self.indexer = ANNIndexWeighted(builder.X)
+
         n = min(self.max_runtime, self.runtime_factor * len(actual))
         self.k = 0
         while(n > 0):
@@ -128,7 +132,7 @@ class LocalSearch(ExplanationMinimizer):
             actual = best
             # self.logger.info("actual ---> " + str(len(actual)))
             
-            for s in self.edge_remove(actual):
+            for s, removed, _ in self.edge_remove(actual):
                 if(self.cache.contains(s)):
                     continue
                 self.cache.add(s)
@@ -139,6 +143,7 @@ class LocalSearch(ExplanationMinimizer):
                     actual = s
                     result = inst
                     n = min(self.max_runtime, self.runtime_factor * len(actual))
+                    self.indexer.recalculate_weights_from_indices([], removed)
                     break
                 
             if(found):
@@ -147,12 +152,12 @@ class LocalSearch(ExplanationMinimizer):
             
             half = int(len(actual) / 2)
             reduce = min(half, random.randint(1, half * 4))
-            actual = self.reduce_random(best, reduce)
+            actual, _, _ = self.reduce_random(best, reduce)
             self.logger.info("actual ---> " + str(len(actual)))
             
             while(len(best) - len(actual) > 1):
                 n-=1
-                for s in self.edge_swap(actual):
+                for s, removed, added in self.edge_swap(actual):
                     if(self.cache.contains(s)):
                         # print("in cache")
                         continue
@@ -165,16 +170,17 @@ class LocalSearch(ExplanationMinimizer):
                         actual = s
                         result = inst
                         n = min(self.max_runtime, self.runtime_factor * len(actual))
+                        self.indexer.recalculate_weights_from_indices(added, removed)
                         break
                     
                 if(found):
                     self.logger.info("============> (=) Found solution with size: " + str(len(actual)))
                     break
 
-                actual = self.reduce_random(best, len(actual))
+                actual, _, _ = self.reduce_random(best, reduce)
                 self.logger.info("actual ===> " + str(len(actual)))
                 
-                for s in self.edge_add(actual, best):
+                for s, _, added in self.edge_add(actual, best):
                     if(self.cache.contains(s)):
                         # print("in cache")
                         continue
@@ -187,6 +193,7 @@ class LocalSearch(ExplanationMinimizer):
                         actual = s
                         result = inst
                         n = min(self.max_runtime, self.runtime_factor * len(actual))
+                        self.indexer.recalculate_weights_from_indices(added, [])
                         break
                     
                 if(found):
@@ -197,7 +204,7 @@ class LocalSearch(ExplanationMinimizer):
                 expand = len(actual) + min(to_expand, random.randint(1, to_expand * 4))
                 # self.logger.info("expand: " + str(expand) + ", best: " + str(len(best)))
                 if(expand > len(best)): break
-                actual = self.reduce_random(best, expand)
+                actual, _, _ = self.reduce_random(best, reduce)
                 self.logger.info("actual +++> " + str(len(actual)))
           
         if(self.oracle.predict(result) == self.oracle.predict(self.G)):
@@ -245,65 +252,45 @@ class LocalSearch(ExplanationMinimizer):
                 data[n2, n1] = (data[n2, n1] + 1) % 2
 
 
-    def swap_random(self, solution : set[int], i: int):  
-        self.remove_random(solution, i)
-        self.add_random(solution, i)
-        
-        return solution
     
-    def add_random(self, solution : set[int], i: int):
-        available_numbers = set(range(1, self.EPlus)) - solution
-        
-        if len(available_numbers) < i:
-            raise ValueError("Not enough available numbers to add.")
-        
-        numbers_to_add = random.sample(available_numbers, i)
-        
-        solution.update(numbers_to_add)
-        
-        return solution
-    
-    def remove_random(self, solution : set[int], i: int):
-        numbers_to_remove = random.sample(solution, i)
-        
-        solution.difference_update(numbers_to_remove)
-        
-        return solution
-    
-    def reduce_random(self, solution : set[int], i: int):
+    def reduce_random(self, solution : set[int], i: int) -> tuple[set[int], set[int], set[int]]:
         if len(solution) < i:
             raise ValueError("The set does not have enough elements.")
         
-        selected_elements = set(random.sample(solution, i))
+        new_s, removed = self.indexer.prune_farthest_in_S(solution, i)
         
-        return selected_elements
+        return [new_s, removed, []]
 
 
-    def edge_swap(self, solution : set[int]) -> Generator[set[int], None, None]:
+    # returns (new solution, removed edges, added edges)
+    def edge_swap(self, solution : set[int]) -> Generator[set[int], set[int], set[int]]:
         cealing = min(len(solution), (self.EPlus - len(solution))) + 1
         step = int(cealing / self.max_neigh) + 1
         for i in range(1, cealing, step):
             for _ in range(self.neigh_factor ** 2):
-                yield self.swap_random(set(solution.copy()), i)
+                new_s, removed = self.indexer.prune_farthest_in_S(solution, i)
+                new_s, added = self.indexer.neighbors_of_centroid(new_s, i)
+                yield [new_s, removed, added]
                 
     
-    def edge_add(self, solution : set[int], best) -> Generator[set[int], None, None]:
+
+    def edge_add(self, solution : set[int], best) -> Generator[set[int], set[int], set[int]]:
         cealing = (len(best) - len(solution)) + 1
         step = int(cealing / self.max_neigh) + 1
         for i in range(1, cealing, step):
             for _ in range(self.neigh_factor ** 2):
-                yield self.add_random(set(solution.copy()), i)
-                
-                
-    
-    def edge_remove(self, solution : set[int]) -> Generator[set[int], None, None]:
+                new_s, added = self.indexer.neighbors_of_centroid(solution, i)
+                yield [new_s, [], added]
+
+    def edge_remove(self, solution : set[int]) -> Generator[set[int], set[int], set[int]]:
         cealing = len(solution)
         step = int((cealing / self.max_neigh) + 1) 
         # cealing = random.randint(cealing - step, cealing)
         for i in range(0, cealing, step):
             for _ in range(self.neigh_factor ** 3):
-                yield self.remove_random(set(solution.copy()), i)
-                
+                new_s, removed = self.indexer.prune_farthest_in_S(solution, i)
+                yield [new_s, removed, []]
+
     def write(self):
         pass
 

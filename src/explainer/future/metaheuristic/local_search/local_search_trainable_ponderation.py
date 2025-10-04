@@ -110,16 +110,7 @@ class LocalSearchTrainable(ExplanationMinimizer, Explainer, Trainable):
         
         
         min_ctf = explaination.counterfactual_instances[0]
-        # min_ctf_dist = self.distance_metric.evaluate(self.G, min_ctf, self.oracle)
-        # for ctf_candidate in explaination.counterfactual_instances:
-        #     candidate_label = self.oracle.predict(ctf_candidate)
 
-        #     if self.M.InitialResponse != candidate_label:
-        #         ctf_distance = self.distance_metric.evaluate(self.G, ctf_candidate, self.oracle)
-                
-        #         if ctf_distance < min_ctf_dist:
-        #             min_ctf_dist = ctf_distance
-        #             min_ctf = ctf_candidate
         
         _, diff_matrix = get_edge_differences(self.G, min_ctf)
         different_coordinates = np.where(diff_matrix == 1)        
@@ -143,11 +134,6 @@ class LocalSearchTrainable(ExplanationMinimizer, Explainer, Trainable):
         
         self.cache = FixedSizeCache(capacity=500000)
         result = self.get_approximation(actual, best, min_ctf)
-        
-        # candidate_label = self.oracle.predict(result)
-        # if self.M.InitialResponse == candidate_label:
-        #     result = self.get_evaluation([])
-        #     self.logger.info("Contrafractual no encontrado")
         
         return result
         
