@@ -117,8 +117,8 @@ class LocalSearch(ExplanationMinimizer):
         n = min(self.max_runtime, self.runtime_factor * len(actual))
         self.k = 0
         while(n > 0):
-            self.logger.info("n: " + str(n))
-            self.logger.info("k: " + str(self.k))
+            # self.logger.info("n: " + str(n))
+            # self.logger.info("k: " + str(self.k))
             n-=1
             if(len(best) == 1) : break
             if(self.k > self.max_oracle_calls) :
@@ -172,7 +172,7 @@ class LocalSearch(ExplanationMinimizer):
                     break
 
                 actual = self.reduce_random(best, len(actual))
-                self.logger.info("actual ===> " + str(len(actual)))
+                # self.logger.info("actual ===> " + str(len(actual)))
                 
                 for s in self.edge_add(actual, best):
                     if(self.cache.contains(s)):
