@@ -10,6 +10,7 @@ class DCM(Explainer, Trainable):
     def init(self):
         self.device = "cpu"
         self.distance_metric = GraphEditDistanceMetric()
+        self.logger = self.context.logger
         super().init()
     
     def real_fit(self):
@@ -27,9 +28,15 @@ class DCM(Explainer, Trainable):
             graphs_by_category[category].append(graph)
         
         # Get the medoid of each category
+
+        index = 0
+        total = len(graphs_by_category)
+
         medoids = {}
         for category, graphs in graphs_by_category.items():
             graphs_distance_total = []
+
+            self.logger.info("Starting category {}/{}".format(index, total))
             
             for graph in graphs:
                 distance = 0
@@ -51,7 +58,10 @@ class DCM(Explainer, Trainable):
                     medoid = graph
             
             medoids[category] = medoid
-        
+
+            self.logger.info("Ending category {}/{}".format(index, total))
+            index += 1
+
         self.model = medoids
         super().fit()
     
