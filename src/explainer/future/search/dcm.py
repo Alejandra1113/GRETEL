@@ -38,7 +38,10 @@ class DCM(Explainer, Trainable):
 
             self.logger.info("Starting category {}/{}".format(index, total))
             
+            n = 0
             for graph in graphs:
+                n +=1
+                self.logger.info("Processing graph {}/{}".format(n, len(graphs)))
                 distance = 0
                 
                 for category_, graphs_ in graphs_by_category.items():
@@ -52,7 +55,10 @@ class DCM(Explainer, Trainable):
             min_distance = float('inf')
             medoid = None
             
+            n = 0
             for graph, distance in graphs_distance_total:
+                n+=1
+                self.logger.info("Processing graph distance {}/{}".format(n, len(graphs)))
                 if min_distance > distance:
                     min_distance = distance
                     medoid = graph
