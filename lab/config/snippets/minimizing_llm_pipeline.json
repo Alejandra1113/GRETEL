@@ -30,6 +30,18 @@
                             {
                                 "class": "src.evaluation.future.stages.sparsity.Sparsity",
                                 "parameters": {} 
+                            },
+                            {
+                                "class": "src.evaluation.future.stages.llm_explanation.LLMexplanation",
+                                "parameters": {}
+                            },
+                            {
+                                "class": "src.evaluation.future.stages.llm_explanation_flip_rate.LLMexplanationFlipRate",
+                                "parameters": {}
+                            },
+                            {
+                                "class": "src.evaluation.future.stages.llm_explanation_contrastive_explanation.LLMexplanationContrastiveExplanation",
+                                "parameters": {}
                             }
                         ]
                     }
