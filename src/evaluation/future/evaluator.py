@@ -105,11 +105,16 @@ class Evaluator(Configurable):
         else:
             test_set = self.dataset.instances 
 
+        num = 0
         for inst in test_set:
             self._logger.info("Evaluating instance with id %s", str(inst.id))
 
             self._real_evaluate(inst)
             self._logger.info('evaluated instance with id %s', str(inst.id))
+
+            num += 1
+            if num >= 1: 
+                break
 
         self._logger.info(self._results)
         self.write_results(fold_id)

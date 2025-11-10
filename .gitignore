@@ -160,3 +160,5 @@ da_test.py
 
 # Log files
 *.out
+
+*.txt
