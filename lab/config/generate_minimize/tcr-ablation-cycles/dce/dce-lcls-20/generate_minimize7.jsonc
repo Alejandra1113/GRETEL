@@ -14,6 +14,7 @@
     "doe-triplets":[
         {
             "compose_do": "./lab/config/snippets/do-pairs/ablation-TCR-300-256-0.20_TCO.json",
+            "compose_dataset_info": "./lab/config/snippets/dataset_infos/tcr-ablation-cycles.json",
             "explainer": { 
                 "class": "src.explainer.future.meta.generate_minimize.GenerateMinimize",
                 "parameters":{

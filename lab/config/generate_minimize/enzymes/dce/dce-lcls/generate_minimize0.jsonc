@@ -14,6 +14,7 @@
     "doe-triplets":[
         {
             "compose_do": "./lab/config/snippets/do-pairs/ENZYMES_GCN.json",
+            "compose_dataset_info": "./lab/config/snippets/dataset_infos/enzymes.json",
             "explainer": { 
                 "class": "src.explainer.future.meta.generate_minimize.GenerateMinimize",
                 "parameters":{
