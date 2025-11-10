@@ -44,10 +44,10 @@ class LLMexplanation(Stage):
             prompt_generator = PromptGenerator(graph_feature, counterfactual_feature, explanation.dataset.domain)
             
             prompt = prompt_generator.generate_prompt()
-            prompt_generator.export_prompt(f"./src/LLMexplaneability/test/prompt_{explanation.dataset.name}_{input_inst.id}_{i}.txt")
+            prompt_generator.export_prompt(f"./lab/llm_explanations/prompt_{explanation.dataset.name}_{input_inst.id}_{i}.txt")
 
             response = gemini.explain_counterfactual(prompt= prompt)
-            gemini.export_explanation(response, file = f"./src/LLMexplaneability/test/explanation_{explanation.dataset.name}_{input_inst.id}_{i}.txt")
+            gemini.export_explanation(response, file = f"./lab/llm_explanations/explanation_{explanation.dataset.name}_{input_inst.id}_{i}.txt")
 
             prompt_generator2 = PromptGenerator(counterfactual_feature, graph_feature, explanation.dataset.domain)
             prompt2 = prompt_generator2.generate_prompt()

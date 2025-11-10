@@ -8,30 +8,6 @@
                                 "parameters": {}
                             },
                             {
-                                "class": "src.evaluation.future.stages.ged.GraphEditDistance",
-                                "parameters": {} 
-                            },
-                            {
-                                "class": "src.evaluation.future.stages.fed.FeatureEditDistance",
-                                "parameters": {} 
-                            },
-                            {
-                                "class": "src.evaluation.future.stages.correctness.Correctness",
-                                "parameters": {} 
-                            },
-                            {
-                                "class": "src.evaluation.future.stages.oracle_calls.OracleCalls",
-                                "parameters": {} 
-                            },
-                            {
-                                "class": "src.evaluation.future.stages.oracle_accuracy.OracleAccuracy",
-                                "parameters": {} 
-                            },
-                            {
-                                "class": "src.evaluation.future.stages.sparsity.Sparsity",
-                                "parameters": {} 
-                            },
-                            {
                                 "class": "src.evaluation.future.stages.llm_explanation.LLMexplanation",
                                 "parameters": {}
                             },
