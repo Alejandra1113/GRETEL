@@ -1,10 +1,6 @@
 from google import genai
 import os
 
-api_key= "AIzaSyCIOT_W5yg0s-Yan1A1StnHRftEl4OI4jk"
-
-model="gemini-2.5-flash"
-
 
 class LLMExplainer:
     def __init__(self, api_key, model):
@@ -17,7 +13,9 @@ class LLMExplainer:
 
 class GeminiExplainer(LLMExplainer):
 
-    def __init__(self, api_key, model):
+    def __init__(self):
+        api_key= "API_KEY_GOES_HERE"
+        model = "gemini-2.5-flash"
         super().__init__(api_key, model)
 
     def explain_counterfactual(self, prompt):

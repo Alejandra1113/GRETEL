@@ -29,7 +29,7 @@ class LLMexplanation(Stage):
 
 
 
-        gemini = GeminiExplainer(api_key = "AIzaSyCIOT_W5yg0s-Yan1A1StnHRftEl4OI4jk", model = "gemini-2.5-flash")
+        gemini = GeminiExplainer()
         i = 0
         explanations = {'direct_explanation':[], 'inverse_explanation':[], 'graph_text': [], 'modifications_text': []}
 

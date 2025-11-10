@@ -20,7 +20,7 @@ class LLMexplanationContrastiveExplanation(MetricStage):
 
     def process(self, explanation: Explanation) -> Explanation:
 
-        gemini = GeminiExplainer(api_key = "AIzaSyCIOT_W5yg0s-Yan1A1StnHRftEl4OI4jk", model = "gemini-2.5-flash")
+        gemini = GeminiExplainer()
         contrastive_explanations = 0
 
         if(explanation.stages_info.get('src.evaluation.future.stages.llm_explanation.LLMexplanation', False)):
