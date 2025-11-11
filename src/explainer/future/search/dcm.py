@@ -14,9 +14,6 @@ class DCM(Explainer, Trainable):
         super().init()
     
     def real_fit(self):
-        super().real_fit()
-
-    def fit(self):
         # Get the category of the graphs
         categorized_graph = [(graph.label, graph) for graph in self.dataset.instances]
         
@@ -69,7 +66,8 @@ class DCM(Explainer, Trainable):
             index += 1
 
         self.model = medoids
-        super().fit()
+
+        super().real_fit()
     
     def explain(self, instance):
         # Get the category of the instance
