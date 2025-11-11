@@ -18,7 +18,7 @@ class DCM(Explainer, Trainable):
 
     def fit(self):
         # Get the category of the graphs
-        categorized_graph = [(self.oracle.predict(graph), graph) for graph in self.dataset.instances]
+        categorized_graph = [(graph.label, graph) for graph in self.dataset.instances]
         
         # Groups the graph by category
         graphs_by_category = {}
