@@ -1,6 +1,7 @@
 from google import genai
 import os
 import time
+import random as rd
 
 
 class LLMExplainer:
@@ -20,6 +21,9 @@ class GeminiExplainer(LLMExplainer):
         super().__init__(api_key, model)
 
     def explain_counterfactual(self, prompt):
+
+        seconds = rd.randint(1, 20)
+        time.sleep(seconds) # wait for 60 seconds before retrying
         client = genai.Client(api_key = self.api_key)
 
         num_tries = 0
