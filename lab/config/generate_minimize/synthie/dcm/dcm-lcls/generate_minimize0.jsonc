@@ -18,12 +18,10 @@
                 "class": "src.explainer.future.meta.generate_minimize.GenerateMinimize",
                 "parameters":{
                     "fold_id": 0,
-                    
                     "generator": { 
                         "class": "src.explainer.future.search.dcm.DCM",
                         "parameters":{
-                            "epochs": 400,
-                            "proportion": 0.5
+                            "epochs": 500
                         }
                     },
                     "minimizer": {

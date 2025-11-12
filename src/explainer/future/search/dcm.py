@@ -12,7 +12,6 @@ class DCM(Explainer, Trainable):
         self.distance_metric = GraphEditDistanceMetric()
         self.logger = self.context.logger
         self.fold_id = self.local_config['parameters']['fold_id']
-        self.proportion = self.local_config['parameters'].get('proportion', 1.0)
         super().init()
     
     def real_fit(self):
@@ -32,11 +31,6 @@ class DCM(Explainer, Trainable):
             if category not in graphs_by_category:
                 graphs_by_category[category] = []
             graphs_by_category[category].append(graph)
-
-        for category in graphs_by_category:
-            n_graphs = len(graphs_by_category[category])
-            n_selected = int(n_graphs * self.proportion)
-            graphs_by_category[category] = graphs_by_category[category][:n_selected]
         
         # Get the medoid of each category
 
