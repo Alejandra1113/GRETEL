@@ -11,15 +11,20 @@ class DCM(Explainer, Trainable):
         self.device = "cpu"
         self.distance_metric = GraphEditDistanceMetric()
         self.logger = self.context.logger
+        self.fold_id = self.local_config['parameters']['fold_id']
         super().init()
     
     def real_fit(self):
-        super().real_fit()
-
-    def fit(self):
-        # Get the category of the graphs
-        categorized_graph = [(self.oracle.predict(graph), graph) for graph in self.dataset.instances]
+        indices = self.dataset.get_split_indices(fold_id=self.fold_id)['train']
         
+        # Get the category of the graphs
+        categorized_graph = []
+
+        for i in indices:
+            graph = self.dataset.get_instance(i)
+            category = graph.label
+            categorized_graph.append((category, graph))
+
         # Groups the graph by category
         graphs_by_category = {}
         for category, graph in categorized_graph:
@@ -33,6 +38,7 @@ class DCM(Explainer, Trainable):
         total = len(graphs_by_category)
 
         medoids = {}
+        distances = {}
         for category, graphs in graphs_by_category.items():
             graphs_distance_total = []
 
@@ -48,8 +54,16 @@ class DCM(Explainer, Trainable):
                     if category == category_:
                         continue
                     for graph_ in graphs_: 
-                        distance += self.distance_metric.evaluate(graph, graph_)
-                
+                        key = (graph.id, graph_.id)
+
+                        if key in distances:
+                            distance += distances[key]
+                        else:
+                            distances[key] = self.distance_metric.evaluate(graph, graph_)
+                            distances[(key[1], key[0])] = distances[key]
+                            
+                        distance += distances[key]
+
                 graphs_distance_total.append((graph, distance))
             
             min_distance = float('inf')
@@ -69,7 +83,8 @@ class DCM(Explainer, Trainable):
             index += 1
 
         self.model = medoids
-        super().fit()
+
+        super().real_fit()
     
     def explain(self, instance):
         # Get the category of the instance
