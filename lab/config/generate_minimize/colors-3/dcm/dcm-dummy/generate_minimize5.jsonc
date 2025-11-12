@@ -21,7 +21,8 @@
                     "generator": { 
                         "class": "src.explainer.future.search.dcm.DCM",
                         "parameters":{
-                            "epochs": 500
+                            "epochs": 500,
+                            "proportion": 0.5
                         }
                     },
                     "minimizer": {
