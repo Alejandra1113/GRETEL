@@ -11,12 +11,20 @@ class DCM(Explainer, Trainable):
         self.device = "cpu"
         self.distance_metric = GraphEditDistanceMetric()
         self.logger = self.context.logger
+        self.fold_id = self.local_config['parameters']['fold_id']
         super().init()
     
     def real_fit(self):
-        # Get the category of the graphs
-        categorized_graph = [(graph.label, graph) for graph in self.dataset.instances]
+        indices = self.dataset.get_split_indices(fold_id=self.fold_id)['train']
         
+        # Get the category of the graphs
+        categorized_graph = []
+
+        for i in indices:
+            graph = self.dataset.get_instance(i)
+            category = graph.label
+            categorized_graph.append((category, graph))
+
         # Groups the graph by category
         graphs_by_category = {}
         for category, graph in categorized_graph:
