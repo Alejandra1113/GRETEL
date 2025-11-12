@@ -30,6 +30,7 @@ class DCM(Explainer, Trainable):
         total = len(graphs_by_category)
 
         medoids = {}
+        distances = {}
         for category, graphs in graphs_by_category.items():
             graphs_distance_total = []
 
@@ -45,8 +46,16 @@ class DCM(Explainer, Trainable):
                     if category == category_:
                         continue
                     for graph_ in graphs_: 
-                        distance += self.distance_metric.evaluate(graph, graph_)
-                
+                        key = (graph.id, graph_.id)
+
+                        if key in distances:
+                            distance += distances[key]
+                        else:
+                            distances[key] = self.distance_metric.evaluate(graph, graph_)
+                            distances[(key[1], key[0])] = distances[key]
+                            
+                        distance += distances[key]
+
                 graphs_distance_total.append((graph, distance))
             
             min_distance = float('inf')
