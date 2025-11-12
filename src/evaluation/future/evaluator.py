@@ -112,6 +112,7 @@ class Evaluator(Configurable):
             self._logger.info('evaluated instance with id %s', str(inst.id))
 
 
+
         self._logger.info(self._results)
         self.write_results(fold_id)
 
