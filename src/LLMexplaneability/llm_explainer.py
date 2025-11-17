@@ -58,7 +58,7 @@ class LocalLlamaExplainer(LLMExplainer):
 
     def __init__(self):
         api_key= None
-        model = "Llama-3.2-1B"
+        model = "Llama-3.1-8B"
         self.path = os.path.abspath(os.path.join('..', ''))
         super().__init__(api_key, model)
 
