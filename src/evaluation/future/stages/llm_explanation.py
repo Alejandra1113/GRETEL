@@ -29,7 +29,7 @@ class LLMexplanation(Stage):
 
 
 
-        gemini = GeminiExplainer()
+        gemini = LocalLlamaExplainer()
         i = 0
         explanations = {'direct_explanation':[], 'inverse_explanation':[], 'graph_text': [], 'modifications_text': []}
 

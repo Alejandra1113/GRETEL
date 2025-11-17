@@ -3,6 +3,8 @@ from google import genai
 import os
 import time
 import random as rd
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
 
 class LLMExplainer:
@@ -31,25 +33,71 @@ class GeminiExplainer(LLMExplainer):
         super().__init__(api_key, model)
 
     def explain_counterfactual(self, prompt):
-        client = genai.Client(api_key = self.api_key)
+
+        # time.sleep(seconds) # wait for 60 seconds before retrying
+        client = genai.Client()
+
+        num_tries = 0
+        # while num_tries < 30:
+        try:
+            resp = client.models.generate_content(
+                model=self.model,
+                contents=prompt
+            )
+            
+            return resp.text
+        except Exception as e:
+            num_tries += 1
+            # time.sleep(60) # wait for 60 seconds before retrying
+            
+        # raise Exception("Failed to get response from the model after multiple attempts.")
+    
+
+  
+class LocalLlamaExplainer(LLMExplainer):
+
+    def __init__(self):
+        api_key= None
+        model = "Llama-3.2-1B"
+        path = os.path.abspath(os.path.join('..', ''))
+        super().__init__(api_key, model)
+
+    def explain_counterfactual(self, prompt):
+
+        local_model_path = os.path.join(self.path, self.model)
+
+        tokenizer = AutoTokenizer.from_pretrained(local_model_path)
+        model = AutoModelForCausalLM.from_pretrained(local_model_path, trust_remote_code=True)
+
+        # Mover a GPU si está disponible
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device)
+
+
+        # Tokenizar
+        inputs = tokenizer(prompt, return_tensors="pt").to(device)
 
         num_tries = 0
         while num_tries < 30:
             try:
-                resp = client.models.generate_content(
-                    model = self.model,
-                    contents = prompt
+                # Generar texto
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=1024,  # cuántos tokens generar
+                    temperature=0.7,     # creatividad
+                    do_sample=True,      # True para sampling
+                    top_p=0.9,           # nucleus sampling
+                    repetition_penalty=1.2
                 )
-                return resp.text
+
+                # Decodificar y mostrar
+                resp = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                return resp
             except Exception as e:
                 num_tries += 1
                 time.sleep(60) # wait for 60 seconds before retrying
             
         raise Exception("Failed to get response from the model after multiple attempts.")
-
-  
-
-    
 
 # class OllamaExplainer(LLMExplainer):
 
