@@ -1,5 +1,5 @@
 from google import genai
-import ollama
+# import ollama
 import os
 import time
 import random as rd
@@ -51,32 +51,32 @@ class GeminiExplainer(LLMExplainer):
 
     
 
-class OllamaExplainer(LLMExplainer):
+# class OllamaExplainer(LLMExplainer):
 
-    def __init__(self):
-        api_key= None
-        model = "llama3"
-        super().__init__(api_key, model)
+#     def __init__(self):
+#         api_key= None
+#         model = "llama3"
+#         super().__init__(api_key, model)
 
-    def explain_counterfactual(self, prompt):
+#     def explain_counterfactual(self, prompt):
 
-        seconds = rd.randint(1, 20)
-        # time.sleep(seconds) # wait for 60 seconds before retrying
-        client = ollama.Client()
+#         seconds = rd.randint(1, 20)
+#         # time.sleep(seconds) # wait for 60 seconds before retrying
+#         client = ollama.Client()
 
 
-        num_tries = 0
-        # while num_tries < 30:
-        try:
-            resp = client.generate(
-                model=self.model,
-                prompt=prompt,
-                stream=False # Configuramos stream en False para obtener la respuesta completa de una vez
-            )
+#         num_tries = 0
+#         # while num_tries < 30:
+#         try:
+#             resp = client.generate(
+#                 model=self.model,
+#                 prompt=prompt,
+#                 stream=False # Configuramos stream en False para obtener la respuesta completa de una vez
+#             )
             
-            return resp.response
-        except Exception as e:
-            num_tries += 1
-            # time.sleep(60) # wait for 60 seconds before retrying
+#             return resp.response
+#         except Exception as e:
+#             num_tries += 1
+#             # time.sleep(60) # wait for 60 seconds before retrying
             
-        # raise Exception("Failed to get response from the model after multiple attempts.")
+#         # raise Exception("Failed to get response from the model after multiple attempts.")
