@@ -37,11 +37,11 @@ class FlipRateEvaluator():
 **Requested output format (labeled Proposal):**\n\
 \n\
 Proposal 1  \n\
-Edges added: { (v1 -- v2), (v1 -- v4), ... }  \n\
-Edges removed: { (v1 -- v2), (v1 -- v4), ... }  \n\
+Edges added: { (1 -- 2), (1 -- 4), ... }  \n\
+Edges removed: { (1 -- 2), (1 -- 4), ... }  \n\
 Node Features Modified:  \n\
-v1: [f1, f2, f3, ...]  \n\
-v2: [f1, f2, f3, ...]  \n\
+1: [1, 2, 3, ...]  \n\
+2: [1, 2, 3, ...]  \n\
 ...\n\
 \n\
 **Notes for you (the model):**\n\
