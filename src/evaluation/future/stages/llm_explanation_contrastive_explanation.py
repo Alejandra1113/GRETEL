@@ -20,7 +20,7 @@ class LLMexplanationContrastiveExplanation(MetricStage):
 
     def process(self, explanation: Explanation) -> Explanation:
 
-        gemini = GeminiExplainer()
+        gemini = LocalLlamaExplainer()
         contrastive_explanations = 0
 
         if(explanation.stages_info.get('src.evaluation.future.stages.llm_explanation.LLMexplanation', False)):

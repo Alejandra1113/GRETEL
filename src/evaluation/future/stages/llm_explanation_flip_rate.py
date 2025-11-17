@@ -26,7 +26,7 @@ class LLMexplanationFlipRate(MetricStage):
 
 
 
-        gemini = GeminiExplainer()
+        gemini = LocalLlamaExplainer()
         flipped = 0
 
         if(explanation.stages_info.get('src.evaluation.future.stages.llm_explanation.LLMexplanation', False)):
