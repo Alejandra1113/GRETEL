@@ -17,10 +17,18 @@ class LLMexplanationContrastiveExplanation(MetricStage):
 
     def init(self):
         super().init()
+        if not hasattr(self.context, 'llm'):
+            self.gemini = LocalLlamaExplainer()
+            self.context.llm = self.gemini
+        else:
+            self.gemini = getattr(self.context, 'llm', None)
+
+        if not hasattr(self.context, 'llm'):
+            self.logger("ISSUE")
 
     def process(self, explanation: Explanation) -> Explanation:
 
-        gemini = LocalLlamaExplainer()
+       
         contrastive_explanations = 0
 
         if(explanation.stages_info.get('src.evaluation.future.stages.llm_explanation.LLMexplanation', False)):
@@ -47,7 +55,7 @@ Do not explain or justify. Output exactly one word: YES or NO.\n\
 {inverse}"
 
 
-                response = gemini.explain_counterfactual(prompt= prompt)
+                response = self.gemini.explain_counterfactual(prompt= prompt)
             
 
                 if response.strip().upper() == "YES":
