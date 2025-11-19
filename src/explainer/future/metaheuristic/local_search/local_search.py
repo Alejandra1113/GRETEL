@@ -99,6 +99,11 @@ class LocalSearch(ExplanationMinimizer):
 
         
         if(len(actual) == 0):
+            self.logger.info("Initial solution size is 0")
+            return min_ctf
+        
+        if(self.oracle.predict(min_ctf) == self.oracle.predict(self.G)):
+            self.logger.info("Generator was incapable of finding counterfactual, returning non ctf")
             return min_ctf
         
         self.cache = FixedSizeCache(capacity=500000)
