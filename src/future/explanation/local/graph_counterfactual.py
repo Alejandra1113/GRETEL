@@ -10,7 +10,6 @@ from src.utils.context import Context
 from src.dataset.dataset_base import Dataset
 from src.core.oracle_base import Oracle
 from src.core.explainer_base import Explainer
-from src.core.llm_base import LLM
 
 
 class LocalGraphCounterfactualExplanation(LocalCounterfactualExplanation):

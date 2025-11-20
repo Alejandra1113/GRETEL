@@ -11,7 +11,7 @@ from src.dataset.dataset_base import Dataset
 from src.utils.cfgnnexplainer.utils import safe_open
 from src.utils.context import Context,clean_cfg
 from src.utils.logger import GLogger
-from src.utils.cfg_utils import retake_dataset, retake_oracle, retake_explainer, retake_scope, retake_results_store_path, retake_run_number, retake_llm
+from src.utils.cfg_utils import retake_dataset, retake_oracle, retake_explainer, retake_scope, retake_results_store_path, retake_run_number
 from src.core.factory_base import get_class, get_instance_kvargs
 from src.future.explanation.local.graph_counterfactual import LocalGraphCounterfactualExplanation
 
