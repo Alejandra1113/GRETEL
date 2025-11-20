@@ -35,8 +35,11 @@
                         }
                     }
                 }
-            }
-        }
+            },
+            "llm": {
+                "class": "src.LLMexplaneability.llm_explainer.GeminiExplainer",
+                "parameters": {}
+            }        }
     ],
     "evaluator": {
         "class": "src.evaluation.future.evaluator.Evaluator",

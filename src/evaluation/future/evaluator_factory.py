@@ -1,5 +1,5 @@
 from src.core.factory_base import Factory
-from src.utils.cfg_utils import inject_dataset, inject_oracle, inject_explainer, inject_scope, inject_run_number, inject_results_store_path
+from src.utils.cfg_utils import inject_dataset, inject_oracle, inject_explainer, inject_scope, inject_run_number, inject_results_store_path, inject_llm
 
 class EvaluatorFactory(Factory):
 

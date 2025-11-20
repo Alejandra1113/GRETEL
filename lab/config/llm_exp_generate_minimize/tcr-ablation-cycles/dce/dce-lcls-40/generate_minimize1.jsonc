@@ -35,6 +35,10 @@
                         }
                     }
                 }
+            },
+            "llm": {
+                "class": "src.LLMexplaneability.llm_explainer.GeminiExplainer",
+                "parameters": {}
             }
         }
     ],
