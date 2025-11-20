@@ -53,7 +53,7 @@ class EvaluatorManager:
             dataset.domain = triplet_snippet['domain'] if 'domain' in triplet_snippet.keys() else "DOMAIN: UNKNOWN\n\n"
             oracle = self.context.factories['oracles'].get_oracle(triplet_snippet['oracle'], dataset)
             explainer = self.context.factories['explainers'].get_explainer(triplet_snippet['explainer'], dataset, oracle)
-            llm = self.context.factories['llms'].get_llm(triplet_snippet['llm'])
+            llm = self.context.factories['llms'].get_llm(triplet_snippet['llm']) if 'llm' in triplet_snippet.keys() else None
             evaluator = self.context.factories['evaluators'].get_evaluator(evaluator_snippet=evaluator_conf, 
                                                                            dataset=dataset, 
                                                                            oracle=oracle,
