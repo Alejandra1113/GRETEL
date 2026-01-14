@@ -4,7 +4,7 @@ import os
 import time
 import random as rd
 from src.core.llm_base import LLM
-from transformers import AutoTokenizer, AutoModelForCausalLM #, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import torch
 
 from src.utils.logger import GLogger
@@ -12,9 +12,11 @@ from src.utils.logger import GLogger
 
 class GeminiExplainer(LLM):
 
-    def init(self):
-        self.api_key= "AIzaSyCIOT_W5yg0s-Yan1A1StnHRftEl4OI4jk"
-        self.model = "gemini-2.5-pro"
+    def __init__(self):
+        self.apis = ""
+        self.index = 0
+        self.api_key= ""
+        self.model = "gemini-2.5-flash"
         self.client = genai.Client(api_key = self.api_key)
 
     def explain_counterfactual(self, system, prompt):
@@ -30,6 +32,11 @@ class GeminiExplainer(LLM):
                 return resp.text
             except Exception as e:
                 num_tries += 1
+                self.index += 1 
+                GLogger.getLogger().info("Cambiando de modelo")
+                self.api_key = self.apis[self.index % len(self.apis)]
+                self.client = genai.Client(api_key = self.api_key)
+
                 time.sleep(60) # wait for 60 seconds before retrying
                 
         raise Exception("Failed to get response from the model after multiple attempts.")
@@ -38,7 +45,17 @@ class GeminiExplainer(LLM):
 class LocalLlamaExplainer(LLM):
 
     def init(self):
-        self.repo_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        # self.repo_id = "meta-llama/Meta-Llama-3.1-8B-Instruct" "Qwen/Qwen2.5-7B-Instruct" "Qwen/Qwen2.5-72B-Instruct"
+        self.repo_id = "meta-llama/Llama-3.1-8B-Instruct"
+
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,   # or torch.float16
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",               # good default
+        )
+
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.repo_id)
 
@@ -70,10 +87,13 @@ class LocalLlamaExplainer(LLM):
 
         torch_dtype = torch.bfloat16 if self.device == "cuda" else torch.float32
 
+        GLogger.getLogger().info("torch dtype = " + str(torch_dtype))
+
         self.model = AutoModelForCausalLM.from_pretrained(
             self.repo_id,
-            dtype=torch_dtype,
+            torch_dtype=torch_dtype,
             trust_remote_code=True,
+            quantization_config=bnb_config,
         ).to(self.device)
 
         if self.device == "mps":
@@ -146,6 +166,10 @@ class LocalLlamaExplainer(LLM):
 
             except Exception as e:
                 num_tries += 1
+                if self.device.startswith("cuda"):
+                    import gc
+                    gc.collect()
+                    torch.cuda.empty_cache()
                 GLogger.getLogger().info(e)
 
         raise Exception("Failed to get response from the model after multiple attempts.")
